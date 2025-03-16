@@ -6,13 +6,33 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import logging
+import os
+from datetime import datetime, timezone
 from tqdm import tqdm
+import pytz
+import shutil
+
+# Get the current timestamp
+current_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+# Define the base directory and new directory path
+base_directory = os.getcwd()
+output_directory = os.path.join(base_directory, current_timestamp)
+
+# Create the new directory
+os.makedirs(output_directory, exist_ok=True)
+
+# Set the timezone to US/Pacific
+os.environ['TZ'] = 'US/Pacific'
+time.tzset()
 
 # Configure logging
+log_file_path = os.path.join(output_directory, "cuda_kernel_logs.log")
 logging.basicConfig(
-    filename="./cuda_kernel_logs.log",
+    filename=log_file_path,
     level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S.%f %Z"
 )
 
 # Define the custom CUDA kernel for element-wise addition
@@ -65,7 +85,7 @@ class ModelNew(nn.Module):
         return self.elementwise_add.elementwise_add_cuda(a, b)
 
 
-def visualize_run_times(run_times):
+def visualize_run_times(run_times, output_dir):
     """Visualize run times with statistics."""
     mean_time = np.mean(run_times)
     std_time = np.std(run_times)
@@ -87,11 +107,13 @@ def visualize_run_times(run_times):
     plt.title('CUDA Kernel Execution Time Over 100 Runs')
     plt.legend()
     plt.grid(True)
-    plt.savefig("run_times_visualization.png")  # Save plot to file
-    plt.show()
+    
+    plot_file = os.path.join(output_dir, "run_times_visualization.png")
+    plt.savefig(plot_file)  # Save plot to file
+    plt.close()
 
 
-def visualize_tensor_distributions(a, b):
+def visualize_tensor_distributions(a, b, output_dir):
     """Visualize tensor distributions."""
     plt.figure(figsize=(10, 6))
     
@@ -107,8 +129,9 @@ def visualize_tensor_distributions(a, b):
     plt.legend()
     plt.grid(True)
     
-    plt.savefig("tensor_distributions.png")  # Save plot to file
-    plt.show()
+    plot_file = os.path.join(output_dir, "tensor_distributions.png")
+    plt.savefig(plot_file)  # Save plot to file
+    plt.close()
 
 
 def main():
@@ -134,27 +157,27 @@ def main():
         torch.cuda.synchronize()  # Wait for the CUDA kernel to finish
         
         end_time = time.time()
-        run_time = end_time - start_time
+        run_time = (end_time - start_time) * 1e6 # Convert to microseconds
         
         run_times.append(run_time)
         
         # Log execution time for each run
-        logging.info(f"Run {i+1}: Execution time: {run_time:.6f} seconds")
+        logging.info(f"Run {i+1}: Execution time: {run_time:.6f} microseconds")
 
     
     # Log summary statistics after all runs
     mean_run_time = np.mean(run_times)
     std_run_time = np.std(run_times)
     
-    logging.info(f"Mean execution time over 100 runs: {mean_run_time:.6f} seconds")
-    logging.info(f"Standard deviation of execution time over 100 runs: {std_run_time:.6f} seconds")
+    logging.info(f"Mean execution time over 100 runs: {mean_run_time:.6f} microseconds")
+    logging.info(f"Standard deviation of execution time over 100 runs: {std_run_time:.6f} microseconds")
 
     
     # Visualize results
-    visualize_run_times(run_times)
+    visualize_run_times(run_times, output_directory)
     
     # Visualize tensor distributions
-    visualize_tensor_distributions(a, b)
+    visualize_tensor_distributions(a, b, output_directory)
 
 
 if __name__ == "__main__":
